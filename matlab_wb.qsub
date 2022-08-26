@@ -1,0 +1,13 @@
+#PBS -N MatlabSubjects
+#PBS -j oe
+#PBS -V
+#PBS -l nodes=1:ppn=12,mem=25gb
+
+#Move into the directory you submitted from
+cd $PBS_O_WORKDIR
+
+#Value of qsub_subject is set as environemt variable MATLABSUBJECT  
+export MATLABSUBJECT="$qsub_subject"
+echo $MATLABSUBJECT
+
+matlab -nodesktop -nosplash  -r wholebrain_github

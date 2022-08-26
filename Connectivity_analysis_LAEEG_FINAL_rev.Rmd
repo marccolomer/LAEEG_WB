@@ -1,0 +1,1235 @@
+---
+title: 'LAEEG: Connectivity analysis: across time'
+author: "Marc Colomer"
+date: "8/25/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r libraries, include= FALSE}
+#library(lme4)
+library(ez)
+library(ggplot2)
+library(tidyverse)
+library(lmerTest)
+library(psychReport)
+path_mac_new <- '/Users/marccolomer/Documents/LAEEG/Rev/final'
+
+```
+
+```{r readdata, include= FALSE}
+
+# Change depending on what frequency band you want to analyze
+freq_range <- '6-9Hz'
+#freq_range <- '4-6Hz'
+#freq_range <- '15-19Hz'
+
+# Cluster pairs
+df_wide_con_FC <- read.csv(paste("input_analysis_R/T_FC_ispc_time_9m_", freq_range, '.csv', sep = ""), sep=",")
+df_con_FC_9m <- gather(df_wide_con_FC, Participant, Connectivity, -Time, - Condition, -Age, -ChannelPair)
+df_wide_con_PC <- read.csv(paste("input_analysis_R/T_PC_ispc_time_9m_", freq_range, '.csv', sep = ""), sep=",")
+df_con_PC_9m <- gather(df_wide_con_PC, Participant, Connectivity, -Time, - Condition, -Age, -ChannelPair)
+df_wide_con_OC <- read.csv(paste("input_analysis_R/T_OC_ispc_time_9m_", freq_range, '.csv', sep = ""), sep=",")
+df_con_OC_9m <- gather(df_wide_con_OC, Participant, Connectivity, -Time, - Condition, -Age, -ChannelPair)
+df_wide_con_FO <- read.csv(paste("input_analysis_R/T_FO_ispc_time_9m_", freq_range, '.csv', sep = ""), sep=",")
+df_con_FO_9m <- gather(df_wide_con_FO, Participant, Connectivity, -Time, - Condition, -Age, -ChannelPair)
+df_wide_con_PO <- read.csv(paste("input_analysis_R/T_PO_ispc_time_9m_", freq_range, '.csv', sep = ""), sep=",")
+df_con_PO_9m <- gather(df_wide_con_PO, Participant, Connectivity, -Time, - Condition, -Age, -ChannelPair)
+
+df_wide_con_FC <- read.csv(paste("input_analysis_R/T_FC_ispc_time_12m_", freq_range, '.csv', sep = ""), sep=",")
+df_con_FC_12m <- gather(df_wide_con_FC, Participant, Connectivity, -Time, - Condition, -Age, -ChannelPair)
+df_wide_con_PC <- read.csv(paste("input_analysis_R/T_PC_ispc_time_12m_", freq_range, '.csv', sep = ""), sep=",")
+df_con_PC_12m <- gather(df_wide_con_PC, Participant, Connectivity, -Time, - Condition, -Age, -ChannelPair)
+df_wide_con_OC <- read.csv(paste("input_analysis_R/T_OC_ispc_time_12m_", freq_range, '.csv', sep = ""), sep=",")
+df_con_OC_12m <- gather(df_wide_con_OC, Participant, Connectivity, -Time, - Condition, -Age, -ChannelPair)
+df_wide_con_FO <- read.csv(paste("input_analysis_R/T_FO_ispc_time_12m_", freq_range, '.csv', sep = ""), sep=",")
+df_con_FO_12m <- gather(df_wide_con_FO, Participant, Connectivity, -Time, - Condition, -Age, -ChannelPair)
+df_wide_con_PO <- read.csv(paste("input_analysis_R/T_PO_ispc_time_12m_", freq_range, '.csv', sep = ""), sep=",")
+df_con_PO_12m <- gather(df_wide_con_PO, Participant, Connectivity, -Time, - Condition, -Age, -ChannelPair)
+
+data_all <- rbind(df_con_FC_9m, df_con_PC_9m, df_con_OC_9m, df_con_FC_12m, df_con_PC_12m, df_con_OC_12m, df_con_FO_9m, df_con_PO_9m, df_con_FO_12m, df_con_PO_12m)
+
+data_all_OC <- data_all%>%
+  filter(ChannelPair == "OC" & Time>-1000 & Time<1000)
+data_all_PC <- data_all%>%
+  filter(ChannelPair == "PC" & Time>-1000 & Time<1000)
+data_all_FC <- data_all%>%
+  filter(ChannelPair == "FC" & Time>-1000 & Time<1000)
+data_all_PO <- data_all%>%
+  filter(ChannelPair == "PO" & Time>-1000 & Time<1000)
+data_all_FO <- data_all%>%
+  filter(ChannelPair == "FO" & Time>-1000 & Time<1000)
+  
+# Whole Brain
+df_wide_con_9m <- read.csv(paste("input_analysis_R/T_thres_acrosstime_cl_9m_ispc_", freq_range, '.csv', sep = ""), sep=",")
+df_con_9m <- gather(df_wide_con_9m, Participant, Threshold, -Time, - Condition, -Age)
+df_wide_con_12m <- read.csv(paste("input_analysis_R/T_thres_acrosstime_cl_12m_ispc_", freq_range, '.csv', sep = ""), sep=",")
+df_con_12m <- gather(df_wide_con_12m, Participant, Threshold, -Time, - Condition, -Age)
+
+data_wb_all <- rbind(df_con_9m, df_con_12m)
+
+subj_before_merging <- filter(data_all_OC, Time == -990, Condition == "cane")
+
+# I need to do this because the names are different, and I want them to be exactly the same
+thres_wb <- select(data_wb_all,c(Threshold,Participant, Time, Condition))%>%
+  mutate(Condition_2 = ifelse(Condition == "Cane", "cane", "grasp"))
+thres_wb$Condition <- thres_wb$Condition_2
+thres_wb <- select(thres_wb, Participant, Threshold, Time, Condition)
+
+data_all_OC <- merge(data_all_OC, thres_wb, by = c("Participant", "Time", "Condition"))
+data_all_PC <- merge(data_all_PC, thres_wb, by = c("Participant", "Time", "Condition"))
+data_all_FC <- merge(data_all_FC, thres_wb, by = c("Participant", "Time", "Condition"))
+data_all_PO <- merge(data_all_PO, thres_wb, by = c("Participant", "Time", "Condition"))
+data_all_FO <- merge(data_all_FO, thres_wb, by = c("Participant", "Time", "Condition"))
+
+subj_after_merging <- filter(data_all_OC, Time == -990, Condition == "cane")
+
+data_all_with_wb <- rbind(data_all_OC, data_all_PC, data_all_FC, data_all_PO, data_all_FO)
+
+data_all_with_wb <- data_all_with_wb%>%
+  #mutate(connectivity_norm = Connectivity)
+  mutate(connectivity_norm = 10*log10(Connectivity/Threshold))
+
+write.table(data_all_with_wb, file = "data_out_withWB.csv", sep = ";", row.names = F)
+
+data_all <- data_all_with_wb
+
+## SUMMARY PARTICIPANTS
+data_sum_subj <- filter(data_all, Time == 0, ChannelPair == "OC", Condition == "grasp")
+
+## NEW BEHAVIOR CODING FILE:
+d_behavior <- read.csv("input_analysis_R/912m_Beh_Marc_121820_HCedit.csv", sep=",")%>%
+  pivot_wider(names_from = Condition, values_from = c(Competence_NEW,Competence_include_OneTrial))
+d_behavior<- rowid_to_column(d_behavior)
+
+d_trials <- read.csv("input_analysis_R/Total_trials_per_condition.csv", sep = ",")
+
+```
+
+### PLOT CONNECTIVITY
+
+## 1. Plot of inter-site connectivity estimates in 500 ms windows for each network of interest
+
+Connectivity estimates are:
+- Normalized by Whole Brain: 10 * log(ISPCpair/ISPCwb)
+- Separated by condition (cane, grasp) and age (9m, 12m)
+- Separated by network (F-C, F-O, P-C, P-O, O-C)
+
+```{r plots_ispc, echo=FALSE}
+
+lbls <- c('-1000:-500', '-500:0', '0:500', '500:1000')
+min_time <- -1000
+max_time <- 1000
+
+sum_all_group <- data_all%>%
+  filter(Time>min_time & Time <=max_time)%>%
+  group_by(Condition, Age, ChannelPair, TimeGroup = cut(Time, 
+               breaks = seq(min_time, max_time, by = 500), labels = lbls), Participant) %>%
+  summarise(mean_con = mean(connectivity_norm, na.rm=TRUE))%>% # mean in 500 ms windows for each subject
+  group_by(Condition, Age, ChannelPair, TimeGroup)%>% # mean across subjects
+  summarise(mean_group = mean(mean_con, na.rm=TRUE), sderr_group = sd(mean_con, na.rm=TRUE)/sqrt(length(Participant)))%>% # mean across subjects
+    mutate(Age_Condition =  paste(Age, "_", Condition))
+
+### PLOT DATA
+sum_all_group$ChannelPair = factor(sum_all_group$ChannelPair, levels=c('FC', 'FO', 'PC', 'PO', 'OC'))
+sum_all_group$Age = factor(sum_all_group$Age, levels=c('9m','12m'))
+
+sum_all_group <- mutate(sum_all_group, TimeWin = ifelse(TimeGroup == "-1000:-500", "[-1,-.5]", ifelse(TimeGroup == "-500:0", "[-.5,0]", ifelse(TimeGroup == "0:500", "[0,.5]", "[.5,1]"))))
+sum_all_group$TimeWin = factor(sum_all_group$TimeWin, levels=c('[-1,-.5]','[-.5,0]', '[0,.5]', '[.5,1]'))
+
+
+p1<- ggplot(sum_all_group, aes(x=TimeWin, y=mean_group, group = Condition, color=Condition)) +
+  geom_line()+geom_point()+geom_errorbar(aes(ymin = mean_group-sderr_group, ymax = mean_group+sderr_group), width = .2, position = position_dodge(0.05)) + facet_grid(Age ~ ChannelPair) + ylab("ISPC (relative to WB)") + xlab("Time Window (s)")
+p1
+ggsave(paste('ispc_acrosstime_condition_chanP&timewin_cl15', freq_range, '.png', sep = ""), plot = last_plot(), device = 'png', scale = 0.6, width = 16, height = 7, path = path_mac_new) 
+
+
+### PLOT COLLAPSING ACROSS AGE
+sum_all_group_noage <- data_all%>%
+  filter(Time>min_time & Time <=max_time)%>%
+  group_by(Condition, ChannelPair, TimeGroup = cut(Time, 
+               breaks = seq(min_time, max_time, by = 500), labels = lbls), Participant) %>%
+  summarise(mean_con = mean(connectivity_norm, na.rm=TRUE))%>%
+  group_by(Condition, ChannelPair, TimeGroup)%>%
+  summarise(mean_group = mean(mean_con, na.rm=TRUE), sderr_group = sd(mean_con, na.rm=TRUE)/sqrt(length(Participant)))
+
+sum_all_group_noage$ChannelPair = factor(sum_all_group_noage$ChannelPair, levels=c('OC', 'FC', 'FO', 'PC', 'PO'))
+
+p1<- ggplot(sum_all_group_noage, aes(x=TimeGroup, y=mean_group, group = Condition, color=Condition)) +
+  geom_line()+geom_point()+geom_errorbar(aes(ymin = mean_group-sderr_group, ymax = mean_group+sderr_group), width = .2, position = position_dodge(0.05)) + facet_grid(. ~ ChannelPair) + ylab("ISPC (relative to WB)") + xlab("Time Window (ms)")
+p1
+ggsave(paste('ispc_acrosstime_condition_chanP&timewin_cl15_noage', freq_range, '.png', sep = ""), plot = last_plot(), device = 'png', scale = 0.6, width = 15, height = 7, path = path_mac_new) 
+
+## AVERAGE ACROSS ALL THE WINDOW, AND COLLAPSING BY AGE (THAT IS, JUST DIFFERENCE BASED ON CONDITION)
+sum_all_group_notime_subj <- data_all%>%
+  filter(Time>min_time & Time <=max_time)%>%
+  group_by(Condition, ChannelPair, Participant) %>%
+  summarise(mean_con = mean(connectivity_norm, na.rm=TRUE))
+sum_all_group_notime <- sum_all_group_notime_subj%>%
+  group_by(Condition, ChannelPair)%>%
+  summarise(mean_group = mean(mean_con, na.rm=TRUE), sderr_group = sd(mean_con, na.rm=TRUE)/sqrt(length(Participant)))
+
+sum_all_group_notime$ChannelPair = factor(sum_all_group_notime$ChannelPair, levels=c('OC', 'FC', 'FO', 'PC', 'PO'))
+sum_all_group_notime_subj$ChannelPair = factor(sum_all_group_notime_subj$ChannelPair, levels=c('OC', 'FC', 'FO', 'PC', 'PO'))
+
+
+p1<-  ggplot() + geom_bar(data=sum_all_group_notime, aes(x=ChannelPair, y = mean_group, fill = Condition, color=Condition), stat = "identity", alpha = .9, position = position_dodge(0.95)) + geom_errorbar(data=sum_all_group_notime, aes(x=ChannelPair, y = mean_group, group = Condition, ymin=mean_group-sderr_group, ymax=mean_group+sderr_group), width=.2, position=position_dodge(.95)) + xlab("Pair of Electrodes") + ylab("Mean ISPC from -1000 to 1000 ms") 
+p1
+ggsave(paste('ispc_acrosstime_condition_chanP&timewin_cl15_noage_allWin', freq_range, '.png', sep = ""), plot = last_plot(), device = 'png', scale = 0.6, width = 15, height = 7, path = path_mac_new) 
+
+
+## AVERAGE ACROSS ALL THE WINDOW, AND COLLAPSING BY CONDITION (THAT IS, JUST DIFFERENCE BASED ON AGE)
+sum_all_group_notime_subj <- data_all%>%
+  filter(Time>-1000 & Time <=-500)%>%
+  group_by(Age, ChannelPair, Participant) %>%
+  summarise(mean_con = mean(connectivity_norm, na.rm=TRUE))
+sum_all_group_notime <- sum_all_group_notime_subj%>%
+  group_by(Age, ChannelPair)%>%
+  summarise(mean_group = mean(mean_con, na.rm=TRUE), sderr_group = sd(mean_con, na.rm=TRUE)/sqrt(length(Participant)))
+
+sum_all_group_notime$ChannelPair = factor(sum_all_group_notime$ChannelPair, levels=c('OC', 'FC', 'FO', 'PC', 'PO'))
+sum_all_group_notime_subj$ChannelPair = factor(sum_all_group_notime_subj$ChannelPair, levels=c('OC', 'FC', 'FO', 'PC', 'PO'))
+
+p1<-  ggplot() + geom_bar(data=sum_all_group_notime, aes(x=ChannelPair, y = mean_group, fill = Age, color=Age), stat = "identity", alpha = .9, position = position_dodge(0.95)) + geom_errorbar(data=sum_all_group_notime, aes(x=ChannelPair, y = mean_group, group = Age, ymin=mean_group-sderr_group, ymax=mean_group+sderr_group), width=.2, position=position_dodge(.95)) + xlab("Pair of Electrodes") + ylab("Mean ISPC from -1000 to -500 ms")
+p1
+ggsave(paste('ispc_acrosstime_condition_chanP&timewin_cl15_noCond_allWin', freq_range, '.png', sep = ""), plot = last_plot(), device = 'png', scale = 0.6, width = 15, height = 7, path = path_mac_new) 
+
+```
+
+## 1.2 Statistical Tests: ISPC in 500 ms windows separated by age, condition, and inter-site pair
+
+```{r statistics_ispc, echo=FALSE}
+
+## Average data in 500 ms time windows
+sum_all_stats <- data_all%>%
+  filter(Time>min_time & Time<=max_time)%>%
+  group_by(TimeGroup = cut(Time, 
+               breaks = seq(min_time, max_time, by = 500), labels = lbls), Condition, Age, Participant, ChannelPair)%>%
+  summarise(mean_stats = mean(connectivity_norm))
+
+
+# Separate data by network
+sum_all_stats_fil <- filter(sum_all_stats, TimeGroup == lbls[1] | TimeGroup == lbls[2] | TimeGroup == lbls[3] | TimeGroup == lbls[4])
+
+## POST-HOC CONDITION * CHANNELPAIR
+sum_all_stats_oc <- sum_all_stats_fil %>%
+  filter(ChannelPair == "OC")
+
+sum_all_stats_fc <- sum_all_stats_fil %>%
+  filter(ChannelPair == "FC")
+
+sum_all_stats_pc <- sum_all_stats_fil %>%
+  filter(ChannelPair == "PC")
+
+sum_all_stats_fo <- sum_all_stats_fil %>%
+  filter(ChannelPair == "FO")
+
+sum_all_stats_po <- sum_all_stats_fil %>%
+  filter(ChannelPair == "PO")  
+
+
+## CHECK FOR NORMALITY
+output_shapiro_oc <- sum_all_stats_oc%>%
+  group_by(TimeGroup,Condition, Age)%>%
+  summarize(shap_stats =  shapiro.test(mean_stats)$p.value)
+output_shapiro_oc
+
+output_shapiro_fc <- sum_all_stats_fc%>%
+  group_by(TimeGroup,Condition, Age)%>%
+  summarize(shap_stats =  shapiro.test(mean_stats)$p.value)
+output_shapiro_fc
+
+output_shapiro_pc <- sum_all_stats_pc%>%
+  group_by(TimeGroup,Condition, Age)%>%
+  summarize(shap_stats =  shapiro.test(mean_stats)$p.value)
+output_shapiro_pc
+
+output_shapiro_po <- sum_all_stats_po%>%
+  group_by(TimeGroup,Condition, Age)%>%
+  summarize(shap_stats =  shapiro.test(mean_stats)$p.value)
+output_shapiro_pc
+
+output_shapiro_fo <- sum_all_stats_fo%>%
+  group_by(TimeGroup,Condition, Age)%>%
+  summarize(shap_stats =  shapiro.test(mean_stats)$p.value)
+output_shapiro_fc
+
+################################################################################
+## MAIN ANALYSIS FOR THE VISUAL-MOTOR NETWORK
+Anova_oc<- ezANOVA(data=sum_all_stats_oc, dv = mean_stats, wid = Participant, within = .(TimeGroup, Condition), between = .(Age), type = 3, detailed = TRUE)
+Anova_oc<- aovEffectSize(Anova_oc, effectSize = "pes")
+show(Anova_oc)
+
+################################################################################
+## ANALYSIS FOR THE CONTROL NETWORKS
+Anova_fc<- ezANOVA(data=sum_all_stats_fc, dv = mean_stats, wid = Participant, within = .(TimeGroup, Condition), between = .(Age), type = 3, detailed = TRUE)
+Anova_fc<- aovEffectSize(Anova_fc, effectSize = "pes")
+show(Anova_fc)
+
+Anova_pc<- ezANOVA(data=sum_all_stats_pc, dv = mean_stats, wid = Participant, within = .(TimeGroup, Condition), between = .(Age), type = 3, detailed = TRUE)
+Anova_pc<- aovEffectSize(Anova_pc, effectSize = "pes")
+show(Anova_pc)
+
+Anova_po<- ezANOVA(data=sum_all_stats_po, dv = mean_stats, wid = Participant, within = .(TimeGroup, Condition), between = .(Age), type = 3, detailed = TRUE)
+Anova_po<- aovEffectSize(Anova_po, effectSize = "pes")
+show(Anova_po)
+
+Anova_fo<- ezANOVA(data=sum_all_stats_fo, dv = mean_stats, wid = Participant, within = .(TimeGroup, Condition), between = .(Age), type = 3, detailed = TRUE)
+Anova_fo<- aovEffectSize(Anova_fo, effectSize = "pes")
+show(Anova_fo)
+
+################################################################################
+## POST-HOC ANALYSIS BASED ON PREVIOUS RESULTS
+## VISUAL-MOTOR NETWORK:
+
+## POST-HOC INTERACTION AGE * TIMEGROUP AT OC CHANNEL PAIR
+sum_all_stats_t1 <- sum_all_stats_oc %>%
+  filter(TimeGroup == lbls[1])
+sum_all_stats_t2 <- sum_all_stats_oc %>%
+  filter(TimeGroup == lbls[2])
+sum_all_stats_t3 <- sum_all_stats_oc %>%
+  filter(TimeGroup == lbls[3])
+sum_all_stats_t4 <- sum_all_stats_oc %>%
+  filter(TimeGroup == lbls[4])
+
+Anova_t<- ezANOVA(data=sum_all_stats_t1, dv = mean_stats, wid = Participant, between = .(Age), type = 3, detailed = TRUE)
+Anova_t<- aovEffectSize(Anova_t, effectSize = "pes") # Significant effect of Age!
+show(Anova_t)
+Anova_t<- ezANOVA(data=sum_all_stats_t2, dv = mean_stats, wid = Participant, between = .(Age), type = 3)
+show(Anova_t)
+Anova_t<- ezANOVA(data=sum_all_stats_t3, dv = mean_stats, wid = Participant, between = .(Age), type = 3)
+show(Anova_t)
+Anova_t<- ezANOVA(data=sum_all_stats_t4, dv = mean_stats, wid = Participant, between = .(Age), type = 3)
+show(Anova_t)
+
+
+## Post-hoc for PO: separating by time group
+## POST-HOC INTERACTION AGE * TIMEGROUP AT OC CHANNEL PAIR
+sum_all_stats_t1 <- sum_all_stats_po %>%
+  filter(TimeGroup == lbls[1])
+sum_all_stats_t2 <- sum_all_stats_po %>%
+  filter(TimeGroup == lbls[2])
+sum_all_stats_t3 <- sum_all_stats_po %>%
+  filter(TimeGroup == lbls[3])
+sum_all_stats_t4 <- sum_all_stats_po %>%
+  filter(TimeGroup == lbls[4])
+
+Anova_t<- ezANOVA(data=sum_all_stats_t1, dv = mean_stats, wid = Participant, within = .(Condition), type = 3, detailed = TRUE)
+Anova_t<- aovEffectSize(Anova_t, effectSize = "pes")
+show(Anova_t)
+Anova_t<- ezANOVA(data=sum_all_stats_t2, dv = mean_stats, wid = Participant, within = .(Condition), type = 3, detailed = TRUE)
+Anova_t<- aovEffectSize(Anova_t, effectSize = "pes")
+show(Anova_t)
+Anova_t<- ezANOVA(data=sum_all_stats_t3, dv = mean_stats, wid = Participant, within = .(Condition), type = 3, detailed = TRUE)
+Anova_t<- aovEffectSize(Anova_t, effectSize = "pes")
+show(Anova_t)
+Anova_t<- ezANOVA(data=sum_all_stats_t4, dv = mean_stats, wid = Participant, within = .(Condition), type = 3, detailed = TRUE)
+Anova_t<- aovEffectSize(Anova_t, effectSize = "pes")
+show(Anova_t)
+
+## POST-HOC TRIPLE INTERACTION F-C. SEPARATING BY AGE AND CONDITION
+sum_all_stats_t1 <- sum_all_stats_fc %>%
+  filter(TimeGroup == lbls[1])
+sum_all_stats_t2 <- sum_all_stats_fc %>%
+  filter(TimeGroup == lbls[2])
+sum_all_stats_t3 <- sum_all_stats_fc %>%
+  filter(TimeGroup == lbls[3])
+sum_all_stats_t4 <- sum_all_stats_fc %>%
+  filter(TimeGroup == lbls[4])
+
+Anova_t<- ezANOVA(data=sum_all_stats_t1, dv = mean_stats, wid = Participant, within = .(Condition), between = .(Age), type = 3, detailed = TRUE)
+Anova_t<- aovEffectSize(Anova_t, effectSize = "pes")
+show(Anova_t)
+Anova_t<- ezANOVA(data=sum_all_stats_t2, dv = mean_stats, wid = Participant, within = .(Condition),between = .(Age), type = 3, detailed = TRUE)
+Anova_t<- aovEffectSize(Anova_t, effectSize = "pes")
+show(Anova_t)
+Anova_t<- ezANOVA(data=sum_all_stats_t3, dv = mean_stats, wid = Participant, within = .(Condition),between = .(Age), type = 3, detailed = TRUE)
+Anova_t<- aovEffectSize(Anova_t, effectSize = "pes")
+show(Anova_t)
+Anova_t<- ezANOVA(data=sum_all_stats_t4, dv = mean_stats, wid = Participant, within = .(Condition),between = .(Age), type = 3, detailed = TRUE)
+Anova_t<- aovEffectSize(Anova_t, effectSize = "pes")
+show(Anova_t)
+
+## Post-hoc to see what happens in the last window in the F-C pair
+sum_all_stats_9m_t4 <- sum_all_stats_t4 %>%
+  filter(Age == "9m")
+sum_all_stats_12m_t4 <- sum_all_stats_t4 %>%
+  filter(Age == "12m")
+
+Anova_t<- ezANOVA(data=sum_all_stats_9m_t4, dv = mean_stats, wid = Participant, within = Condition, type = 3, detailed = TRUE)
+Anova_t<- aovEffectSize(Anova_t, effectSize = "pes")
+show(Anova_t)
+Anova_t<- ezANOVA(data=sum_all_stats_12m_t4, dv = mean_stats, wid = Participant, within = Condition, type = 3, detailed = TRUE)
+Anova_t<- aovEffectSize(Anova_t, effectSize = "pes")
+show(Anova_t)
+
+```
+
+
+## 1. Plot Whole-Brain connectivity estimates in 500 ms windows
+
+Connectivity estimates are:
+- Separated by condition (cane, grasp) and age (9m, 12m)
+
+```{r plot_wholebrain, echo=FALSE}
+
+  lbls <- c('-1000:-500', '-500:0', 
+            '0:500', '500:1000')
+  min_time <- -1000
+  max_time <- 1000
+  
+  sum_con <- data_wb_all%>%
+    filter(Time > min_time & Time < max_time)%>%
+    group_by(TimeGroup = cut(Time,
+                 breaks = seq(min_time, max_time, by = 500), labels = lbls), Age, Condition, Participant)%>%
+    summarise(mean_1 = mean(Threshold))%>%
+    group_by(Condition, Age, TimeGroup)%>%
+    summarise(mean_group = mean(mean_1, na.rm=TRUE), sderr_group = sd(mean_1)/sqrt(length(Participant)),
+           n_subj = length(Participant))%>%
+    mutate(Age_Condition =  paste(Age, "_", Condition))
+  
+    sum_con_subj <- data_wb_all%>%
+    filter(Time > min_time & Time < max_time)%>%
+    group_by(Time, Age, Condition, Participant)%>%
+    summarise(mean_1 = mean(Threshold))%>%
+    group_by(Participant, Condition, Age, TimeGroup = cut(Time,
+                 breaks = seq(min_time, max_time, by = 500), labels = lbls))%>%
+    summarise(mean_group = mean(mean_1, na.rm=TRUE))%>%
+    mutate(Age_Condition =  paste(Age, "_", Condition))
+ 
+     ## PLOT WITH CONDITION AND AGE
+  p1<- ggplot(sum_con, aes(x=TimeGroup, y=mean_group, group = Age_Condition, linetype=Age, color=Condition)) + geom_line()+geom_point()+geom_errorbar(aes(ymin = mean_group-sderr_group, ymax = mean_group+sderr_group), width = .2, position = position_dodge(0.05)) + ylab("ISPC Whole Brain") + xlab("Time Window") 
+  #+ ylim(0.53, 0.575)
+  
+  p1
+  ggsave(paste('wb_thres_acrosstime_timewin_ispc_cl15', freq_range, '.png', sep = ""), plot = last_plot(), device = 'png', scale = 0.75, width = 6, height = 4, path = path_mac_new)
+
+  
+  ## PLOT WITH AGE AND NO CONDITION
+    sum_con_nocond <- data_wb_all%>%
+    filter(Time > min_time & Time < max_time)%>%
+    group_by(TimeGroup = cut(Time,
+                 breaks = seq(min_time, max_time, by = 500), labels = lbls), Age, Condition, Participant)%>%
+    summarise(mean_1 = mean(Threshold))%>%
+    group_by(Age, TimeGroup)%>%
+    summarise(mean_group = mean(mean_1, na.rm=TRUE), sderr_group = sd(mean_1)/sqrt(length(Participant)),
+           n_subj = length(Participant))
+  
+ p1<- ggplot(sum_con_nocond, aes(x=TimeGroup, y=mean_group, group = Age, color=Age)) + geom_line()+geom_point()+geom_errorbar(aes(ymin = mean_group-sderr_group, ymax = mean_group+sderr_group), width = .2, position = position_dodge(0.05)) + ylab("ISPC Whole Brain") + xlab("Time Window") 
+  #+ ylim(0.53, 0.575)
+  
+  p1
+  ggsave(paste('wb_thres_acrosstime_timewin_ispc_cl15_noCond', freq_range, '.png', sep = ""), plot = last_plot(), device = 'png', scale = 0.75, width = 6, height = 4, path = path_mac_new)
+  
+  
+    ## PLOT WITH CONDITION AND NO AGE
+    sum_con_noage <- data_wb_all%>%
+    filter(Time > min_time & Time < max_time)%>%
+    group_by(TimeGroup = cut(Time,
+                 breaks = seq(min_time, max_time, by = 500), labels = lbls), Age, Condition, Participant)%>%
+    summarise(mean_1 = mean(Threshold))%>%
+    group_by(Condition, TimeGroup)%>%
+    summarise(mean_group = mean(mean_1, na.rm=TRUE), sderr_group = sd(mean_1)/sqrt(length(Participant)),
+           n_subj = length(Participant))
+  
+ p1<- ggplot(sum_con_noage, aes(x=TimeGroup, y=mean_group, group = Condition, color=Condition)) + geom_line()+geom_point()+geom_errorbar(aes(ymin = mean_group-sderr_group, ymax = mean_group+sderr_group), width = .2, position = position_dodge(0.05)) + ylab("ISPC Whole Brain") + xlab("Time Window") 
+  #+ ylim(0.53, 0.575)
+  
+  p1
+  ggsave(paste('wb_thres_acrosstime_timewin_ispc_cl15_noAge', freq_range, '.png', sep = ""), plot = last_plot(), device = 'png', scale = 0.75, width = 6, height = 4, path = path_mac_new)
+  
+
+```
+  
+## 2.2 Statistical Tests: ISPCwb in 500 ms windows separated by age and condition
+
+```{r statistics_wholebrain, echo=FALSE}
+
+###################### Summarize data
+sum_all_stats <- data_wb_all%>%
+  filter(Time>min_time & Time<=max_time)%>%
+  group_by(TimeGroup = cut(Time, 
+               breaks = seq(min_time, max_time, by = 500), labels = lbls), Condition, Age, Participant)%>%
+  summarise(mean_stats = mean(Threshold))%>%
+  mutate(mean_stats_log = log10(mean_stats))
+
+## CHECK FOR NORMALITY
+output_shapiro_wb <- sum_all_stats%>%
+group_by(TimeGroup,Condition, Age)%>%
+summarize(shap_stats =  shapiro.test(mean_stats_log)$p.value)
+output_shapiro_wb
+
+################################################################################
+## Main Statistical Test (Anova)
+Anova <- ezANOVA(data=sum_all_stats, dv = mean_stats_log, wid = Participant, within = .(Condition, TimeGroup), between = .(Age), type = 3, detailed = TRUE)
+Anova<- aovEffectSize(Anova, effectSize = "pes")
+show(Anova)
+
+
+## Post-hoc analyses
+sum_all_stats_t1 <- sum_all_stats %>%
+  filter(TimeGroup == lbls[1])
+
+sum_all_stats_t2 <- sum_all_stats %>%
+  filter(TimeGroup == lbls[2])
+
+sum_all_stats_t3 <- sum_all_stats %>%
+  filter(TimeGroup == lbls[3])
+
+sum_all_stats_t4 <- sum_all_stats %>%
+  filter(TimeGroup == lbls[4])
+
+Anova_t1<- ezANOVA(data=sum_all_stats_t1, dv = mean_stats_log, wid = Participant, within = .(Condition), between = .(Age), type = 3, detailed = TRUE)
+Anova_t1<- aovEffectSize(Anova_t1, effectSize = "pes")
+show(Anova_t1)
+
+Anova_t2<- ezANOVA(data=sum_all_stats_t2, dv = mean_stats_log, wid = Participant, within = .(Condition), between = .(Age), type = 3)
+show(Anova_t2)
+
+Anova_t3<- ezANOVA(data=sum_all_stats_t3, dv = mean_stats_log, wid = Participant, within = .(Condition), between = .(Age), type = 3)
+show(Anova_t3)
+
+Anova_t4<- ezANOVA(data=sum_all_stats_t4, dv = mean_stats_log, wid = Participant, within = .(Condition), between = .(Age), type = 3)
+show(Anova_t4)
+
+```
+
+
+## 3. Relations between motor skills and ISPC in visual-motor network and control networks
+
+```{r ISPC_vs_MotorSkills, echo=FALSE}
+
+## SUMMARIZE DATA
+lbls <- c('-1000:-500', '-500:0', 
+          '0:500', '500:1000')
+
+min_time <- -1000
+max_time <- 1000
+
+sum_all_stats <- data_all_with_wb%>%
+  filter(Time>min_time & Time<=max_time)%>%
+  group_by(TimeGroup = cut(Time, 
+               breaks = seq(min_time, max_time, by = 500), labels = lbls), Condition, Age, Participant, ChannelPair)%>%
+  summarise(mean_stats = mean(connectivity_norm))
+
+sum_all_stats_t2 <- sum_all_stats %>%
+  filter(TimeGroup == lbls[1]) # Change if you want to analyze another window
+
+######################################################################
+######################################################################
+## LINK TO BEHAVIOR
+
+## FIRST, PREPARE DATA
+
+sum_all_stats_wide<- sum_all_stats_t2 %>%
+  pivot_wider(names_from = c(Condition,ChannelPair), values_from = mean_stats)%>%
+  arrange(desc(Age)) # BE CAREFUL WITH THIS. MAKE SURE THAT THE ORDER IS THE SAME AS IN d_behavior
+
+sum_all_stats_wide<- rowid_to_column(sum_all_stats_wide)
+
+d_con_beh <- merge(sum_all_stats_wide,d_behavior, by = "rowid")%>%
+  select(-c(TimeGroup, rowid, subnum))%>%
+  pivot_longer(
+  cols = cane_FC:grasp_PO,
+  names_to = "Condition.ChanPair",
+  values_to = "Connectivity")%>%
+  separate(Condition.ChanPair,c("Condition", "ChanPair"))%>%
+  mutate(GraspLat = Competence_NEW_Grasp/1000)%>%
+  mutate(CaneLat = Competence_NEW_Cane/1000)
+
+
+## NOW, LINK IT TO BEHAVIOR
+## 1. GRASP LATENCY
+d_con_beh_noNaN <- d_con_beh[!is.na(d_con_beh$GraspLat),]
+  
+p_data <- ggplot(d_con_beh_noNaN, aes(x=GraspLat, y=Connectivity, fill = Age, color = Age)) +
+  geom_point(shape=1) +     # Use hollow circles
+  geom_smooth(method=lm) + facet_grid(. ~ ChanPair) + ylab("ISPC anticipation") + xlab("Grasp Latency (s)")
+p_data 
+ggsave(paste('GraspLatVSispc_normWB_acrosstime_-1000-500_Age_noCond_cl15_O', freq_range, '.png', sep = ""), plot = last_plot(), device = 'png', scale = 0.6, width = 13, height = 7, path = path_mac_new)
+
+## MIXED-EFFECTS GRASP COMPETENCE AND CONNECTIVITY
+
+d_con_beh_oc <- d_con_beh_noNaN %>%
+  filter(ChanPair == "OC")
+d_con_beh_fc <- d_con_beh_noNaN %>%
+  filter(ChanPair == "FC")
+d_con_beh_pc <- d_con_beh_noNaN %>%
+  filter(ChanPair == "PC")
+d_con_beh_fo <- d_con_beh_noNaN %>%
+  filter(ChanPair == "FO")
+d_con_beh_po <- d_con_beh_noNaN %>%
+  filter(ChanPair == "PO")  
+
+## MIXED EFFECT MODELS
+# BASIC MODEL = O-C
+m.0 <- lmer(Connectivity ~ (1 | Participant) , data=d_con_beh_oc, REML = FALSE)  # build
+
+# ADD THE NEXT MORE "OBVIOUS" VARIABLE
+m.0_1 <- update(m.0, .~. + Age) 
+m.1_0 <- update(m.0_1, .~. + Condition) 
+m.1_1 <- update(m.1_0, .~. + Age:Condition)
+
+m.2_0 <- update(m.1_1, .~. + GraspLat)
+m.2_1 <- update(m.2_0, .~. + GraspLat:Condition)
+m.2_2 <- update(m.2_0, .~. + GraspLat:Age)
+m.2_3 <- update(m.2_0, .~. + GraspLat:Age:Condition)
+
+anova(m.0,m.0_1,m.1_0,m.1_1,m.2_0,m.2_1, m.2_3) 
+anova(m.2_0)
+summary(m.2_0)
+
+## BASED ON SIGNIFICANT EFFECTS (OR MARGINALLY SIGNIFICANT) BUILD MODELS FOR THE CONTROL NETWORKS
+# BASIC MODEL = F-C
+m.0 <- lmer(Connectivity ~  (1 | Participant) , data=d_con_beh_fc, REML = FALSE)  # build
+
+# ADD THE NEXT MORE "OBVIOUS" VARIABLE
+m.0_1 <- update(m.0, .~. + Condition) 
+m.1_0 <- update(m.0_1, .~. + Age) 
+m.2_0 <- update(m.1_0, .~. + GraspLat) 
+anova(m.0,m.0_1,m.1_0,m.2_0)
+
+# BASIC MODEL = F-O
+m.0 <- lmer(Connectivity ~  (1 | Participant) , data=d_con_beh_fo, REML = FALSE)  # build
+
+# ADD THE NEXT MORE "OBVIOUS" VARIABLE
+m.0_1 <- update(m.0, .~. + Condition) 
+m.1_0 <- update(m.0_1, .~. + Age) 
+m.2_0 <- update(m.1_0, .~. + GraspLat) 
+anova(m.0,m.0_1,m.1_0,m.2_0)
+
+# BASIC MODEL = P-C
+m.0 <- lmer(Connectivity ~ (1 | Participant), data=d_con_beh_pc, REML = FALSE)  # build
+
+# ADD THE NEXT MORE "OBVIOUS" VARIABLE
+m.0_1 <- update(m.0, .~. + Condition) 
+m.1_0 <- update(m.0_1, .~. + Age) 
+m.2_0 <- update(m.1_0, .~. + GraspLat) 
+anova(m.0,m.0_1,m.1_0,m.2_0)
+
+# BASIC MODEL = P-O
+m.0 <- lmer(Connectivity ~ (1 | Participant), data=d_con_beh_po, REML = FALSE)  # build
+
+# ADD THE NEXT MORE "OBVIOUS" VARIABLE
+m.0_1 <- update(m.0, .~. + Condition) 
+m.1_0 <- update(m.0_1, .~. + Age) 
+m.2_0 <- update(m.1_0, .~. + GraspLat) 
+anova(m.0,m.0_1,m.1_0,m.2_0)
+
+
+## 3. CANE LATENCY
+d_con_beh_noNaN <- d_con_beh[!is.na(d_con_beh$CaneLat),]
+
+p_data <- ggplot(d_con_beh_noNaN, aes(x=CaneLat, y=Connectivity, shape=Age, colour=Age, fill=Age)) +
+  geom_point(shape=1) +     # Use hollow circles
+  geom_smooth(method=lm) + facet_grid(. ~ ChanPair) + ylab("ISPC anticipation") + xlab("Cane Latency (s)")
+p_data 
+ggsave(paste('ispcVSCaneLat_normWB_acrosstime_-1000-500_Age_noCond_cl15', freq_range, '.png', sep = ""), plot = last_plot(), device = 'png', scale = 0.8, width = 11, height = 6, path = path_mac_new)
+
+## LINEAR MODEL GRASP COMPETENCE AND CONNECTIVITY
+# LINEAR MODEL
+
+d_con_beh_oc <- d_con_beh_noNaN %>%
+  filter(ChanPair == "OC")
+d_con_beh_fc <- d_con_beh_noNaN %>%
+  filter(ChanPair == "FC")
+d_con_beh_pc <- d_con_beh_noNaN %>%
+  filter(ChanPair == "PC")
+d_con_beh_fo <- d_con_beh_noNaN %>%
+  filter(ChanPair == "FO")
+d_con_beh_po <- d_con_beh_noNaN %>%
+  filter(ChanPair == "PO")  
+
+## MIXED EFFECT MODELS
+# BASIC MODEL = O-C
+m.0 <- lmer(Connectivity ~ (1 | Participant) , data=d_con_beh_pc, REML = FALSE)  # build
+
+# ADD THE NEXT MORE "OBVIOUS" VARIABLE
+m.0_1 <- update(m.0, .~. + Condition) 
+m.1_0 <- update(m.0_1, .~. + Age) 
+m.1_1 <- update(m.1_0, .~. + Age:Condition)
+
+m.2_0 <- update(m.1_1, .~. + CaneLat) 
+m.2_1 <- update(m.2_0, .~. + CaneLat:Age)
+m.2_2 <- update(m.2_0, .~. + CaneLat:Condition)
+m.2_3 <- update(m.2_0, .~. + CaneLat:Age:Condition)
+
+anova(m.0,m.0_1,m.1_0,m.1_1,m.2_0,m.2_1, m.2_3)
+
+# Check if grasp competence and cane competence are correlated
+d_behavior_fil <- d_behavior[!is.na(d_behavior$Competence_NEW_Cane),]
+lm_out <- lm(Competence_NEW_Cane ~ Competence_NEW_Grasp , data=d_behavior_fil, REML = FALSE)  # build
+summary(lm_out)
+
+```
+
+
+## 4. ANALYSIS LOOKING AT THE RELATION BETWEEN EXPERIENCE AND CONNECTIVITY OVER TIME (in 10 ms steps)
+```{r ISPC_vs_ActionExperience_R2, echo=FALSE}
+
+# Change depending on the model you want to test
+#model <- 1 # Simple model just with GraspLat
+model <- 2 #  Model that also includes age and condition
+
+## DEFINE SLIDING WINDOWS OF INTEREST AND AVERAGE ACROSS THE TIME WINDOW
+time_all <- data_all_with_wb%>%
+  filter(Participant == "connect_overtime_LA_EEG_12_P04_CTS_MTH_chanpair_12m.mat" & Condition == "cane" & ChannelPair == "OC")%>%
+  select(Time)
+
+time_all <- as.matrix(time_all)
+it_pos <- 1
+step <- 100
+n_rows <- length(seq(-990, 990, by=10))
+out_R2_oc <- data.frame(matrix(nrow = n_rows, ncol = 1))
+out_R2_fc <- data.frame(matrix(nrow = n_rows, ncol = 1))
+out_R2_pc <- data.frame(matrix(nrow = n_rows, ncol = 1))
+out_R2_fo <- data.frame(matrix(nrow = n_rows, ncol = 1))
+out_R2_po <- data.frame(matrix(nrow = n_rows, ncol = 1))
+
+for (time_vec in seq(-990, 990, by=10)){
+  
+  sum_oc <- data_all_with_wb%>%
+  filter(Time>=time_vec & Time <= time_vec + step)%>%
+  filter(ChannelPair == "OC")%>%
+  group_by(Participant,Time, Condition, Age)%>%
+  mutate(Connect = mean(connectivity_norm))
+  
+  sum_fc <- data_all_with_wb%>%
+  filter(Time>=time_vec & Time <= time_vec + step)%>%
+  filter(ChannelPair == "FC")%>%
+  group_by(Participant,Time, Condition, Age)%>%
+  mutate(Connect = mean(connectivity_norm))
+  
+  sum_fo <- data_all_with_wb%>%
+  filter(Time>=time_vec & Time <= time_vec + step)%>%
+  filter(ChannelPair == "FO")%>%
+  group_by(Participant,Time, Condition, Age)%>%
+  mutate(Connect = mean(connectivity_norm))
+    
+  sum_pc <- data_all_with_wb%>%
+  filter(Time>=time_vec & Time <= time_vec + step)%>%
+  filter(ChannelPair == "PC")%>%
+  group_by(Participant,Time, Condition, Age)%>%
+  mutate(Connect = mean(connectivity_norm))
+  
+  sum_po <- data_all_with_wb%>%
+  filter(Time>=time_vec & Time <= time_vec + step)%>%
+  filter(ChannelPair == "PO")%>%
+  group_by(Participant,Time, Condition, Age)%>%
+  mutate(Connect = mean(connectivity_norm))
+  
+  ## MERGE CONNECTIVITY WITH BEHAVIORAL DATA
+  data_beh <- select(d_con_beh, c(Participant, GraspLat, CaneLat, Condition, Age))
+  data_oc_beh <- merge(sum_oc, d_con_beh, by = c("Participant", "Condition", "Age"))
+  data_fc_beh <- merge(sum_fc, d_con_beh, by = c("Participant", "Condition", "Age"))
+  data_fo_beh <- merge(sum_fo, d_con_beh, by = c("Participant", "Condition", "Age"))
+  data_pc_beh <- merge(sum_pc, d_con_beh, by = c("Participant", "Condition", "Age"))
+  data_po_beh <- merge(sum_po, d_con_beh, by = c("Participant", "Condition", "Age"))
+
+  if (model == 1){ # Simple model just with GraspLat
+
+    linearMod_LT <- lm(Connect ~ GraspLat, data=data_oc_beh)  # build
+    s_oc <- summary(linearMod_LT)
+    out_R2_oc[it_pos,1] <- s_oc$r.squared
+    
+    linearMod_LT <- lm(Connect ~ GraspLat, data=data_fc_beh)  # build
+    s_fc <- summary(linearMod_LT)
+    out_R2_fc[it_pos,1] <- s_fc$r.squared
+    
+    linearMod_LT <- lm(Connect ~ GraspLat, data=data_fo_beh)  # build
+    s_fo <- summary(linearMod_LT)
+    out_R2_fo[it_pos,1] <- s_fo$r.squared
+    
+    linearMod_LT <- lm(Connect ~ GraspLat, data=data_pc_beh)  # build
+    s_pc <- summary(linearMod_LT)
+    out_R2_pc[it_pos,1] <- s_pc$r.squared
+    
+    linearMod_LT <- lm(Connect ~ GraspLat, data=data_po_beh)  # build
+    s_po <- summary(linearMod_LT)
+    out_R2_po[it_pos,1] <- s_po$r.squared 
+  
+  } else { # Model including age and condition
+    
+    linearMod_LT <- lm(Connect ~ GraspLat + Condition + Age, data=data_oc_beh)  # build
+    s_oc <- summary(linearMod_LT)
+    out_R2_oc[it_pos,1] <- s_oc$r.squared
+    
+    linearMod_LT <- lm(Connect ~ GraspLat + Condition + Age, data=data_fc_beh)  # build
+    s_fc <- summary(linearMod_LT)
+    out_R2_fc[it_pos,1] <- s_fc$r.squared
+    
+    linearMod_LT <- lm(Connect ~ GraspLat + Condition + Age, data=data_fo_beh)  # build
+    s_fo <- summary(linearMod_LT)
+    out_R2_fo[it_pos,1] <- s_fo$r.squared
+    
+    linearMod_LT <- lm(Connect ~ GraspLat + Condition + Age, data=data_pc_beh)  # build
+    s_pc <- summary(linearMod_LT)
+    out_R2_pc[it_pos,1] <- s_pc$r.squared
+    
+    linearMod_LT <- lm(Connect ~ GraspLat + Condition + Age, data=data_po_beh)  # build
+    s_po <- summary(linearMod_LT)
+    out_R2_po[it_pos,1] <- s_po$r.squared 
+    
+  }
+  
+  it_pos <- it_pos + 1  
+}
+
+col_chan <- "OC"
+col_time <- seq(-990, 990, by=10)
+out_R2_oc <- cbind(out_R2_oc, col_chan, col_time)
+colnames(out_R2_oc) <- c("DV","ChanPair","Time")
+
+col_chan <- "FC"
+out_R2_fc <- cbind(out_R2_fc, col_chan, col_time)
+colnames(out_R2_fc) <- c("DV","ChanPair","Time")
+
+col_chan <- "FO"
+out_R2_fo <- cbind(out_R2_fo, col_chan, col_time)
+colnames(out_R2_fo) <- c("DV","ChanPair","Time")
+
+col_chan <- "PC"
+out_R2_pc <- cbind(out_R2_pc, col_chan, col_time)
+colnames(out_R2_pc) <- c("DV","ChanPair","Time")
+
+col_chan <- "PO"
+out_R2_po <- cbind(out_R2_po, col_chan, col_time)
+colnames(out_R2_po) <- c("DV","ChanPair","Time")
+
+data_R2_all <- rbind(out_R2_oc,out_R2_fc,out_R2_fo,out_R2_pc,out_R2_po)
+data_R2_all$ChanPair = factor(data_R2_all$ChanPair, levels=c('OC', 'FC', 'FO', 'PC', 'PO'))
+
+lim <- c(0,0.35)
+p_data_R2 <- ggplot(data_R2_all, aes(x=Time, y=DV)) + 
+geom_line(aes(color = ChanPair), size = 1) + ylab("R-squared") + xlab("Time (ms)") + ylim(lim) + scale_x_continuous(breaks = scales::pretty_breaks(n = 8)) + labs(fill = "Channel Pair") 
+p_data_R2 
+if(model == 1) {
+ggsave(paste('PTEEG_R2_normPerc_Lat_noCond_noAge', freq_range, '.png', sep = ""), plot = last_plot(), device = 'png', scale = 0.6, width = 10, height = 7, path = path_mac_new) } else {
+ggsave(paste('PTEEG_R2_normPerc_GrLat_Cond_Age', freq_range, '.png', sep = ""), plot = last_plot(), device = 'png', scale = 0.6, width = 10, height = 7, path = path_mac_new) }
+
+```
+
+## 5. Check whether the number of trials correlates with ISPC estimates
+
+```{r number_trials, echo=FALSE}
+
+## SUMMARIZE DATA
+  lbls <- c('-1000:-500', '-500:0', 
+          '0:500', '500:1000')
+
+min_time <- -1000
+max_time <- 1000
+
+sum_all_data <- data_all_with_wb%>%
+  filter(Time>min_time & Time<=max_time)%>%
+  group_by(TimeGroup = cut(Time, 
+               breaks = seq(min_time, max_time, by = 500), labels = lbls), Condition, Age, Participant, ChannelPair)%>%
+  summarise(mean_ispc = mean(connectivity_norm), mean_wb = mean(Threshold))%>%
+  filter(ChannelPair == "OC")
+
+data_with_trials = merge(sum_all_data, d_trials, by = c("Participant", "Age", "Condition"))
+
+p_data <- ggplot(data_with_trials, aes(x=Num_trials, y=mean_ispc, shape=TimeGroup, colour=TimeGroup, fill=TimeGroup)) +
+  geom_point(shape=1) +     # Use hollow circles
+  geom_smooth(method=lm) + ylab("ISPCoc relative to WB") + xlab("Number Trials")
+p_data 
+ggsave(paste('VPEEG_trials_ISPCoc', freq_range, '.png', sep = ""), plot = last_plot(), device = 'png', scale = 0.6, width = 13, height = 7, path = path_mac_new)
+
+p_data <- ggplot(data_with_trials, aes(x=Num_trials, y=mean_wb, shape=TimeGroup, colour=TimeGroup, fill=TimeGroup)) +
+  geom_point(shape=1) +     # Use hollow circles
+  geom_smooth(method=lm) + ylab("Whole-Brain ISPC") + xlab("Number Trials")
+p_data 
+ggsave(paste('VPEEG_trials_ISPCwb', freq_range, '.png', sep = ""), plot = last_plot(), device = 'png', scale = 0.6, width = 13, height = 7, path = path_mac_new)
+
+
+linearMod_LT <- lm(mean_ispc ~ Num_trials + TimeGroup + Age + Condition, data=data_with_trials)  # build
+summary(linearMod_LT)
+
+linearMod_LT <- lm(mean_wb ~ Num_trials + TimeGroup + Age + Condition, data=data_with_trials)  # build
+summary(linearMod_LT)
+
+
+```
+
+## ADDITIONAL ANALYSIS NOT INCLUDED IN THE MAIN MANUSCRIPT:
+# A1. Similar to analysis 3 (Motor skills & ISPC), but looking at the group level (separating infants by their competence using the median)
+
+```{r barplot_median, echo=FALSE}
+
+## SUMMARIZE DATA
+lbls <- c('-1000:-500', '-500:0', 
+          '0:500', '500:1000')
+
+min_time <- -1000
+max_time <- 1000
+
+sum_all_stats <- data_all_with_wb%>%
+  filter(Time>min_time & Time<=max_time)%>%
+  group_by(TimeGroup = cut(Time, 
+               breaks = seq(min_time, max_time, by = 500), labels = lbls), Condition, Age, Participant, ChannelPair)%>%
+  summarise(mean_stats = mean(connectivity_norm))
+
+sum_all_stats_t2 <- sum_all_stats %>%
+  filter(TimeGroup == lbls[1])
+
+######################################################################
+######################################################################
+## LINK TO BEHAVIOR
+
+## FIRST, PREPARE DATA
+
+sum_all_stats_wide<- sum_all_stats_t2 %>%
+  pivot_wider(names_from = c(Condition,ChannelPair), values_from = mean_stats)%>%
+  arrange(desc(Age)) # BE CAREFUL WITH THIS. MAKE SURE THAT THE ORDER IS THE SAME AS IN d_behavior
+
+sum_all_stats_wide<- rowid_to_column(sum_all_stats_wide)
+
+d_con_beh <- merge(sum_all_stats_wide,d_behavior, by = "rowid")%>%
+  select(-c(TimeGroup, rowid, subnum))%>%
+  pivot_longer(
+  cols = cane_FC:grasp_PC,
+  names_to = "Condition.ChanPair",
+  values_to = "Connectivity")%>%
+  separate(Condition.ChanPair,c("Condition", "ChanPair"))%>%
+  mutate(GraspLat = Competence_NEW_Grasp/1000)%>%
+  mutate(CaneLat = Competence_NEW_Cane/1000)
+
+median_comp <- median(d_con_beh$GraspLat[which(!is.na(d_con_beh$GraspLat))])
+
+## NOW, LINK IT TO BEHAVIOR
+
+## FIRST BAR PLOT only with OC (what will go in the paper)
+d_con_beh_noNaN <- d_con_beh[!is.na(d_con_beh$GraspLat),]%>%
+  filter(ChanPair == "OC")%>%
+  mutate(group_competence = ifelse(GraspLat > median_comp, "Slow", "Fast"))%>%
+  group_by(Condition, group_competence)%>%
+  summarise(Connectivity_mean = mean(Connectivity), sd_c = sd(Connectivity)/sqrt(length(Participant)), sd = sd(Connectivity))
+
+d_con_beh_noNaN2 <- d_con_beh_noNaN%>%
+  mutate(Condition2 = ifelse(Condition == "cane", "Novel", "Familiar"))%>%
+  within(Condition2 <- factor(Condition2, levels=names(sort(table(Condition2), decreasing=FALSE))))
+
+d_con_beh_noNaN2$Condition2 <- factor(d_con_beh_noNaN2$Condition2, levels=c('Novel','Familiar'))
+
+p_bar <- ggplot(d_con_beh_noNaN2, aes(x=group_competence, y=Connectivity_mean, fill=Condition2)) + geom_bar(stat="identity", position=position_dodge()) +
+  geom_errorbar(aes(ymin=Connectivity_mean-sd_c, ymax=Connectivity_mean+sd_c), width=.2,
+                position=position_dodge(.9)) +
+  xlab("Grasp Competence") + ylab("ISPC visual-motor network (anticipation)") + labs(fill = "Condition")
+p_bar 
+ggsave('Bar_ISPCnormWB_PC_groupcompetence_-1000-500_cl15.png', plot = last_plot(), device = 'png', scale = 0.75, width = 7, height = 4, path = path_mac_new)
+
+
+## FOR STATISTICS
+d_con_beh_oc <- d_con_beh[!is.na(d_con_beh$GraspLat),]%>%
+  filter(ChanPair == "OC")%>%
+  mutate(group_competence = ifelse(GraspLat > median_comp, "Slow", "Fast"))
+
+# STATISTICS FOR EACH CHANNEL PAIR (ANOVA BASED ON GROUP COMPETENCE)
+Anov_oc <- ezANOVA(data=d_con_beh_oc, dv = Connectivity, wid = Participant, within = .(Condition), between = .(group_competence), type = 3, detailed = TRUE)  # build
+show(Anov_oc)
+
+## TO CALCULATE EFFECT SIZE (PARTIAL ETA SQUARE)
+Anov_oc$ANOVA$PartialEta = Anov_oc$ANOVA$SSn/(Anov_oc$ANOVA$SSn + Anov_oc$ANOVA$SSd) # To compute residuals for each effect!
+show(Anov_oc)
+
+
+# Z-TEST for the only model that show a difference based on grasp competence
+d_con_beh_oc_fast <- d_con_beh_oc %>%
+  filter(group_competence == "Fast" & Condition == "cane")
+
+d_con_beh_oc_slow <- d_con_beh_oc %>%
+  filter(group_competence == "Slow" & Condition == "cane")
+
+t.test(d_con_beh_oc_fast$Connectivity, mu = 0, alternative = "two.sided")
+t.test(d_con_beh_oc_slow$Connectivity, mu = 0, alternative = "two.sided")
+
+d_con_beh_oc_fast <- d_con_beh_oc %>%
+  filter(group_competence == "Fast" & Condition == "grasp")
+
+d_con_beh_oc_slow <- d_con_beh_oc %>%
+  filter(group_competence == "Slow" & Condition == "grasp")
+
+t.test(d_con_beh_oc_fast$Connectivity, mu = 0, alternative = "two.sided")
+t.test(d_con_beh_oc_slow$Connectivity, mu = 0, alternative = "two.sided")
+
+
+d_con_beh_oc_fast <- d_con_beh_oc %>%
+  filter(group_competence == "Fast")
+d_con_beh_oc_slow <- d_con_beh_oc %>%
+  filter(group_competence == "Slow")
+t.test(d_con_beh_oc_fast$Connectivity, mu = 0, alternative = "two.sided")
+t.test(d_con_beh_oc_slow$Connectivity, mu = 0, alternative = "two.sided")
+
+
+```
+
+
+## A2. RELATIONS BETWEEN WHOLE BRAIN CONNECTIVITY AND MOTOR COMPETENCE
+
+```{r thetanormWB, echo=FALSE}
+
+## SUMMARIZE DATA
+lbls <- c('-1000:-500', '-500:0', '0:500', '500:1000')
+min_time <- -1000
+max_time <- 1000
+
+sum_all_stats <- data_wb_all%>%
+  filter(Time>min_time & Time<=max_time)%>%
+  group_by(TimeGroup = cut(Time, 
+              breaks = seq(min_time, max_time, by = 500), labels = lbls), Condition, Age, Participant)%>%
+  group_by(Condition, Age, Participant, TimeGroup)%>%
+  #group_by(Condition, Age, Participant)%>% #If we don't want to define time windows
+  summarise(mean_stats = mean(Threshold))
+
+#sum_all_stats_t2 <- sum_all_stats # if all time window. If not, use following code
+sum_all_stats_t2 <- sum_all_stats %>%
+  filter(TimeGroup == lbls[1])
+
+######################################################################
+######################################################################
+## LINK TO BEHAVIOR
+## FIRST, PREPARE DATA
+sum_all_stats_wide<- sum_all_stats_t2 %>%
+  pivot_wider(names_from = c(Condition), values_from = mean_stats)
+
+sum_all_stats_wide<- rowid_to_column(sum_all_stats_wide)
+
+d_con_beh <- merge(sum_all_stats_wide,d_behavior, by = "rowid")%>%
+  select(-c(rowid, subnum))%>%
+  pivot_longer(
+  cols = Cane:Grasp,
+  names_to = "Condition",
+  values_to = "Connectivity")%>%
+  mutate(GraspLat = Competence_NEW_Grasp/1000)%>%
+  mutate(CaneLat = Competence_NEW_Cane/1000)
+
+## NOW, LINK IT TO BEHAVIOR
+## 1. GRASP LATENCY
+d_con_beh_noNaN <- d_con_beh[!is.na(d_con_beh$GraspLat),]
+#  filter(Condition == "Grasp") ## remove subjects with NaN 
+  
+p_data <- ggplot(d_con_beh_noNaN, aes(x=GraspLat, y=Connectivity, shape=Condition, colour=Condition, fill=Condition)) + geom_point(shape=1) +     # Use hollow circles
+  geom_smooth(method=lm) + ylab("WHOLE BRAIN ISPC: -1000 to -500 ms") + xlab("Grasp Latency (s)") + facet_grid(. ~ Age)
+p_data
+
+## LINEAR MODEL GRASP COMPETENCE AND CONNECTIVITY
+## MIXED EFFECT MODELS
+# BASIC MODEL
+m.0 <- lmer(Connectivity ~ Condition + (1 | Participant) , data=d_con_beh_noNaN, REML = FALSE)  # build
+
+# ADD THE NEXT MORE "OBVIOUS" VARIABLE
+m.1_0 <- update(m.0, .~. + Age) 
+m.1_1 <- update(m.1_0, .~. + Age*Condition)
+
+m.2_0 <- update(m.1_1, .~. + GraspLat) 
+m.2_1 <- update(m.2_0, .~. + GraspLat*Condition)
+m.2_2 <- update(m.2_0, .~. + GraspLat*Age*Condition)
+
+anova(m.0,m.1_0,m.1_1,m.2_0,m.2_1,m.2_2) # 2_0 is not sign
+
+
+## 2. CANE SUCCESS
+d_con_beh_noNaN <- d_con_beh[!is.na(d_con_beh$CaneLat),]
+#  filter(Condition == "Cane") ## remove subjects with NaN 
+  
+p_data <- ggplot(d_con_beh_noNaN, aes(x=CaneLat, y=Connectivity, shape=Condition, colour=Condition, fill=Condition)) +
+  geom_point(shape=1) +     # Use hollow circles
+  geom_smooth(method=lm) + ylab("WHOLE BRAIN ISPC: -1000 to -500 ms") + xlab("Cane Latency (s)") + facet_grid(. ~ Age)
+p_data 
+#ggsave('wholebrainVSCaneLat_acrosstime_Allwin_age_new.png', plot = last_plot(), device = 'png', scale = 0.7, width = 10, height = 7, path = path_mac_new)
+
+## MIXED EFFECT MODELS
+# BASIC MODEL
+m.0 <- lmer(Connectivity ~ Condition + (1 | Participant) , data=d_con_beh_noNaN, REML = FALSE)  # build
+
+# ADD THE NEXT MORE "OBVIOUS" VARIABLE
+m.1_0 <- update(m.0, .~. + Age) 
+m.1_1 <- update(m.1_0, .~. + Age*Condition)
+
+m.2_0 <- update(m.1_1, .~. + CaneLat) 
+m.2_1 <- update(m.2_0, .~. + CaneLat*Condition)
+m.2_2 <- update(m.2_0, .~. + CaneLat*Age*Condition)
+
+anova(m.0,m.1_0,m.1_1,m.2_0,m.2_1,m.2_2) # 2_0 is not sign
+
+```
+
+
+## A3. CHECK RELATIONS BETWEEN WHOLE BRAIN AND INTER-SITE NETWORKS
+
+```{r thetanormWB, echo=FALSE}
+
+## SUMMARIZE DATA
+
+lbls <- c('-1000:-500 ms', '-500:0 ms', 
+          '0:-500 ms', '500:1000 ms')
+min_time <- -1000
+max_time <- 1000
+
+sum_all_stats <- data_all_with_wb%>%
+  filter(Time>min_time & Time<=max_time)%>%
+  group_by(TimeGroup = cut(Time, 
+               breaks = seq(min_time, max_time, by = 500), labels = lbls), Condition, Age, Participant, ChannelPair)%>%
+  summarise(mean_stats = mean(connectivity_norm), mean_wb = mean(Threshold)) # NO NORMALIZED
+
+sum_all_stats_t2 <- sum_all_stats %>%
+  filter(TimeGroup == lbls[1])
+
+######################################################################
+######################################################################
+## LINK TO BEHAVIOR
+
+## 1. GRASP 
+d_con_fil <- filter(sum_all_stats_t2,Condition == "grasp")
+p_data <- ggplot(d_con_fil, aes(x=mean_wb, y=mean_stats, color = Age, shape = Age, fill=Age)) +
+  geom_point(shape=1) +     # Use hollow circles
+  geom_smooth(method=lm) + facet_grid(. ~ ChannelPair) + ylab("ISPC Grasp") + xlab("ISPC Whole Brain ")
+p_data
+ggsave('ChanPairvsWB_acrosstime_grasp_-1000-500.png', plot = last_plot(), device = 'png', scale = 0.7, width = 13, height = 6, path = path_mac_new)
+
+d_con_fil_oc <- filter(d_con_fil,ChannelPair == "OC")
+d_con_fil_pc <- filter(d_con_fil,ChannelPair == "PC")
+d_con_fil_fc <- filter(d_con_fil,ChannelPair == "FC")
+
+lm_grasp_oc <- lm(mean_stats ~ mean_wb*Age, data=d_con_fil_oc)  # build
+summary(lm_grasp_oc)
+
+lm_grasp_pc <- lm(mean_stats ~ mean_wb*Age, data=d_con_fil_pc)  # build
+summary(lm_grasp_pc)
+lm_grasp_fc <- lm(mean_stats ~ mean_wb*Age, data=d_con_fil_fc)  # build
+summary(lm_grasp_fc)
+
+# BASIC MODEL = CHANNEL PAIR
+m.0 <- lmer(mean_stats ~ ChannelPair + (1 | Participant), data=d_con_fil, REML = FALSE)  # build
+
+# ADD THE NEXT MORE "OBVIOUS" VARIABLE
+m.1_0 <- update(m.0, .~. + Age) 
+m.1_1 <- update(m.1_0, .~. + Age*ChannelPair)
+
+# FINALLY WE ADD WB
+m.2_0 <- update(m.1_1, .~. + mean_wb)
+m.2_1 <- update(m.2_0, .~. + mean_wb*ChannelPair)
+m.2_2 <- update(m.2_0, .~. + mean_wb*ChannelPair*Age)
+
+anova(m.0,m.1_0, m.1_1, m.2_0,m.2_1, m.2_2) # 2_0 is not sign
+
+anova(m.2_0)
+summary(m.2_0)
+
+
+## 2. CANE
+d_con_fil <- filter(sum_all_stats_t2,Condition == "cane")
+p_data <- ggplot(d_con_fil, aes(x=mean_wb, y=mean_stats, shape=Age, colour=Age, fill=Age)) +
+  geom_point(shape=1) +     # Use hollow circles
+  geom_smooth(method=lm) + facet_grid(. ~ ChannelPair)  + ylab("ISPC Cane") + xlab("ISPC Whole Brain ")
+p_data
+ggsave('ChanPairvsWB_acrosstime_cane_-1000-500.png', plot = last_plot(), device = 'png', scale = 0.7, width = 13, height = 6, path = path_mac_new)
+
+d_con_fil_oc <- filter(d_con_fil,ChannelPair == "OC")
+d_con_fil_pc <- filter(d_con_fil,ChannelPair == "PC")
+d_con_fil_fc <- filter(d_con_fil,ChannelPair == "FC")
+
+lm_cane_oc <- lm(mean_stats ~ mean_wb*Age, data=d_con_fil_oc)  # build
+summary(lm_cane_oc)
+lm_cane_pc <- lm(mean_stats ~ mean_wb*Age, data=d_con_fil_pc)  # build
+summary(lm_cane_pc)
+lm_cane_fc <- lm(mean_stats ~ mean_wb*Age, data=d_con_fil_fc)  # build
+summary(lm_cane_fc)
+
+
+# BASIC MODEL = CHANNEL PAIR
+m.0 <- lmer(mean_stats ~ ChannelPair + (1 | Participant), data=d_con_fil, REML = FALSE)  # build
+
+# ADD THE NEXT MORE "OBVIOUS" VARIABLE
+m.1_0 <- update(m.0, .~. + Age) 
+m.1_1 <- update(m.1_0, .~. + Age*ChannelPair)
+
+# FINALLY WE ADD WB
+m.2_0 <- update(m.1_1, .~. + mean_wb)
+m.2_1 <- update(m.2_0, .~. + mean_wb*ChannelPair)
+m.2_2 <- update(m.1_1, .~. + mean_wb*ChannelPair*Age)
+
+anova(m.0,m.1_0,m.1_1,m.2_0,m.2_1, m.2_2) # 2_0 is not sign
+
+anova(m.2_0)
+summary(m.2_0)
+
+
+```
+
+## A4. CORRELATE CONNECTIVITY (ISPC across time normalized by whole brain threshold) AND POWER
+
+```{r thetanormWB, echo=FALSE}
+
+## SUMMARIZE DATA
+
+lbls <- c('-1000:-500 ms', '-500:0 ms', 
+          '0:-500 ms', '500:1000 ms')
+min_time <- -1000
+max_time <- 1000
+
+sum_all_stats <- data_all_with_wb%>%
+  filter(Time>min_time & Time<=max_time)%>%
+  #mutate(TimeGroup = cut(Time, breaks = seq(min_time, max_time, by = 500), labels = lbls))
+  group_by(TimeGroup = cut(Time, 
+               breaks = seq(min_time, max_time, by = 500), labels = lbls), Condition, Age, Participant, ChannelPair)%>%
+  summarise(mean_stats = mean(connectivity_norm))
+
+sum_all_stats_t2 <- sum_all_stats %>%
+  filter(TimeGroup == lbls[1])
+
+######################################################################
+######################################################################
+## LINK TO BEHAVIOR
+
+## FIRST, PREPARE DATA
+sum_all_stats_wide<- sum_all_stats_t2 %>%
+  pivot_wider(names_from = c(Condition,ChannelPair), values_from = mean_stats)
+
+sum_all_stats_wide<- rowid_to_column(sum_all_stats_wide)
+
+
+d_behavior <- read.csv("LAEEG_power_results_R.csv", sep=",")
+d_behavior<- rowid_to_column(d_behavior)
+
+d_con_power <- merge(sum_all_stats_wide,d_behavior, by = "rowid")%>%
+  select(-c(TimeGroup, rowid, Subj))%>%
+  pivot_longer(
+  cols = cane_FC:grasp_OC,
+  names_to = "Condition.ChanPair",
+  values_to = "Connectivity"
+)%>%
+  separate(Condition.ChanPair,c("Condition", "ChanPair"))
+
+## NOW, LINK IT TO POWER
+
+## 1. GRASP 
+d_con_fil <- filter(d_con_power,Condition == "grasp")
+p_data <- ggplot(d_con_fil, aes(x=Connectivity, y=Grasp.Mu.1000500, shape=Age, colour=Age, fill=Age)) +
+  geom_point(shape=1) +     # Use hollow circles
+  geom_smooth(method=lm) + facet_grid(. ~ ChanPair) + ylab("Mu Power Grasp") + xlab("ISPC across time")
+p_data
+ggsave('ChanPair_normWbvsPower_acrosstime_grasp_-1000-500.png', plot = last_plot(), device = 'png', scale = 0.8, width = 11, height = 9, path = path_mac_new)
+
+linearMod_grasp <- lm(Grasp.Mu.1000500 ~ Connectivity*Age*ChanPair, data=d_con_fil)  # build
+summary(linearMod_grasp)
+
+## 2. CANE
+d_con_fil <- filter(d_con_power,Condition == "cane")
+p_data <- ggplot(d_con_fil, aes(x=Connectivity, y=Cane.Mu.1000500, shape=Condition, colour=Age, fill=Age)) +
+  geom_point(shape=1) +     # Use hollow circles
+  geom_smooth(method=lm) + facet_grid(. ~ ChanPair)  + ylab("Mu Power Cane") + xlab("ISPC across time")
+p_data
+ggsave('ChanPair_normWbvsPower_acrosstime_cane_-1000-500.png', plot = last_plot(), device = 'png', scale = 0.8, width = 11, height = 9, path = path_mac_new)
+
+linearMod_cane <- lm(Cane.Mu.1000500 ~ Connectivity*Age*ChanPair, data=d_con_fil)  # build
+summary(linearMod_cane)
+
+
+```
+
+
